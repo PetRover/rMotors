@@ -7,17 +7,20 @@
 
 #include <string>
 #include "rPower.h"
+#include "pins.h"
 
 namespace RVR
 {
+    // Representations of the motors in the rover product
     enum MotorName
     {
-        DRIVE_MOTOR_1,
-        DRIVE_MOTOR_2,
-        CAMERA_MOTOR,
-        TREAT_MOTOR
+        DRIVE_MOTOR_1, // Wheel drive motor #1
+        DRIVE_MOTOR_2, // Wheel drive motor #2
+        CAMERA_MOTOR, // Camera articulation motor
+        TREAT_MOTOR // Treat dispenser motor
     };
 
+    // A data structure that contains all of the information to describe the connections to a given motor in the system
     class MotorProperties
     {
     public:
@@ -32,12 +35,12 @@ namespace RVR
         int SLEEP; // pin value for SLEEP
         int RESET; // pin value for RESET
         int DECAY; // pin value for DECAY
-        RVR::PowerRail * POWER_RAIL; // pointer to the power rail that the motor runs off of
+        RVR::PowerRail *POWER_RAIL; // pointer to the power rail that the motor runs off of
         int V_REF; // value (in mV) of the reference voltage
         int R_SENSE; // value (in mOhm) of the sense resistor
         int I_FULL_SCALE; // maximum value (in mA) of the chopping current
 
-        MotorProperties(){}
+        MotorProperties() { }
 
         //! All arguments constructor
         /*!
@@ -56,15 +59,40 @@ namespace RVR
           \param vRef value (in mV) of the reference voltage
           \param vRef value (in mOhm) of the sense resistor
         */
-        MotorProperties(int in1, int in2, int i0, int i1, int i2, int i3, int i4, int fault, int sleep, int reset, int decay, RVR::PowerRail * powerRail, int vRef, int rSense);
+        MotorProperties(int in1, int in2, int i0, int i1, int i2, int i3, int i4, int fault, int sleep, int reset,
+                        int decay, RVR::PowerRail *powerRail, int vRef, int rSense);
     };
 
 
+    // Base class for motor objects
     class Motor
     {
+    private:
+        PwmPin In1Pwm; // A pin object that allows control of the IN1 pin of the motor controller
+        PwmPin In2Pwm; // A pin object that allows control of the IN2 pin of the motor controller
+        GpioPin I0Gpio; // A pin object that allows control of the I0 pin of the motor controller
+        GpioPin I1Gpio; // A pin object that allows control of the I1 pin of the motor controller
+        GpioPin I2Gpio; // A pin object that allows control of the I2 pin of the motor controller
+        GpioPin I3Gpio; // A pin object that allows control of the I3 pin of the motor controller
+        GpioPin I4Gpio; // A pin object that allows control of the I4 pin of the motor controller
+        GpioPin FaultGpio; // A pin object that allows reading from the FAULT pin the the motor controller
+        GpioPin SleepGpio; // A pin object that allows control of the SLEEP pin the the motor controller
+        GpioPin ResetGpio; // A pin object that allows control of the RESET pin the the motor controller
+        GpioPin DecayGpio; // A pin object that allows control of the DECAY pin the the motor controller
+
+        // Helper function to set up the pin objects used for interfacing with the motor controller
+        int setupPins();
+
+        // Helper function to take destruct the pin objects used for interfacing with the motor controller
+        int takeDownPins();
+
     public:
-        Motor(){}
+        Motor() { }
+
+        // Initializes a motor object corresponding to the motor name given
         Motor(MotorName motorName);
+
+        ~Motor();
 
         //! Sets the current limit of the motor
         /*!
@@ -73,20 +101,24 @@ namespace RVR
         int setCurrentLimit(int currentLimit);
 
     protected:
+        // stores the motor properties for the specific motor which an instance of this class represents
         const MotorProperties *motorProperties;
 
-        static const MotorProperties * const drive1MotorMapping;
-        static const MotorProperties * const drive2MotorMapping;
-        static const MotorProperties * const treatMotorMapping;
-        static const MotorProperties * const cameraMotorMapping;
+        // The fixed properties for each motor in the rover product
+        static const MotorProperties *const drive1MotorMapping;
+        static const MotorProperties *const drive2MotorMapping;
+        static const MotorProperties *const treatMotorMapping;
+        static const MotorProperties *const cameraMotorMapping;
 
     };
 
+    // Subclass to represent a stepper motor (controlled by the DRV8843 chip)
     class StepperMotor : public Motor
     {
 
     };
 
+    // Subclass to represent a DC motor (controlled by the DRV8842 chip)
     class DcMotor : public Motor
     {
 
