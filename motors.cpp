@@ -131,26 +131,4 @@ namespace RVR
 
         return 0;
     }
-
-    int Motor::takeDownPins()
-    {
-        delete this->In1Pwm;
-        delete this->In2Pwm;
-        delete this->I0Gpio;
-        delete this->I1Gpio;
-        delete this->I2Gpio;
-        delete this->I3Gpio;
-        delete this->I4Gpio;
-        delete this->FaultGpio;
-        delete this->SleepGpio;
-        delete this->ResetGpio;
-        delete this->DecayGpio;
-
-        return 0;
-    }
-
-    Motor::~Motor()
-    {
-        this->takeDownPins();
-    }
 }

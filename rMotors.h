@@ -83,16 +83,11 @@ namespace RVR
         // Helper function to set up the pin objects used for interfacing with the motor controller
         int setupPins();
 
-        // Helper function to take destruct the pin objects used for interfacing with the motor controller
-        int takeDownPins();
-
     public:
         Motor() { }
 
         // Initializes a motor object corresponding to the motor name given
         Motor(MotorName motorName);
-
-        ~Motor();
 
         //! Sets the current limit of the motor
         /*!
