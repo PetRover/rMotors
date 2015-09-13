@@ -134,7 +134,7 @@ namespace RVR
     class DcMotor : public Motor
     {
     private:
-        unsigned int rampTime;
+        unsigned int rampTime = 0;
     public:
         DcMotor(MotorName motorName) : Motor(motorName) { };
 

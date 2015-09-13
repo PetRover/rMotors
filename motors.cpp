@@ -3,7 +3,7 @@
 //
 
 #include "rMotors.h"
-#include <ctime>
+#include <chrono>
 #include <unistd.h>
 
 
@@ -64,7 +64,9 @@ namespace RVR
     }
 
     RVR::PowerRail* motorRail = RVR::PowerManager::getRail(RVR::RAIL12V0);
-    const RVR::MotorProperties * const RVR::Motor::drive1MotorMapping = new RVR::MotorProperties(1, 2, 3, 4, 5, 6, 7, 8, 9, 10 ,11, motorRail, 2500, 250);
+    const RVR::MotorProperties *const RVR::Motor::drive1MotorMapping = new RVR::MotorProperties(36, 2, 3, 4, 5, 7, 8, 9,
+                                                                                                10, 11, 12, motorRail,
+                                                                                                2500, 250);
     const RVR::MotorProperties * const RVR::Motor::drive2MotorMapping = new RVR::MotorProperties(1, 2, 3, 4, 5, 6, 7, 8, 9, 10 ,11, motorRail, 2500, 250);
     const RVR::MotorProperties * const RVR::Motor::treatMotorMapping = new RVR::MotorProperties(1, 2, 3, 4, 5, 6, 7, 8, 9, 10 ,11, motorRail, 2500, 250);
     const RVR::MotorProperties * const RVR::Motor::cameraMotorMapping = new RVR::MotorProperties(1, 2, 3, 4, 5, 6, 7, 8, 9, 10 ,11, motorRail, 2500, 250);
@@ -181,19 +183,32 @@ namespace RVR
         {
             pwmPercentPerRampStep = targetSpeedPercent;
         }
-        std::clock_t rampStartTime = std::clock();
+
 
         this->In1Pwm->setDutyCyclePercent(pwmInPercent);
         this->In1Pwm->setEnable(true);
         this->In2Gpio->setValue(gpioInValue);
-        do
+
+        int loopCount = 0;
+        std::chrono::duration<double> rampTimeElapsed;
+
+        std::chrono::high_resolution_clock::time_point rampStartTime = std::chrono::high_resolution_clock::now();
+        do // Note, no print functions inside this loop because they will slow it down
         {
+            loopCount++;
             pwmInPercent += rampPolarity * pwmPercentPerRampStep;
             this->In1Pwm->setDutyCyclePercent(pwmInPercent);
-            usleep(1000);
+            do
+            {
+                rampTimeElapsed = std::chrono::duration_cast<std::chrono::duration<double>>(
+                        std::chrono::high_resolution_clock::now() - rampStartTime);
+                usleep(50);
+            }
+            while (rampTimeElapsed.count() * 1000 < loopCount); // Each loop should take 1 ms
+
         }
-        while ((std::clock() - rampStartTime) * 1000 / (double) CLOCKS_PER_SEC <= this->rampTime);
-        printf("The error was %f", (targetSpeedPercent - pwmInPercent));
+        while (rampTimeElapsed.count() * 1000 < this->rampTime);
+
         this->In1Pwm->setDutyCyclePercent(targetSpeedPercent);
 
         this->state = MotorState::RUNNING;
