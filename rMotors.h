@@ -20,6 +20,21 @@ namespace RVR
         TREAT_MOTOR // Treat dispenser motor
     };
 
+    // Representations of directions that a motor can spin
+    enum class MotorDirection
+    {
+        FORWARD,
+        REVERSE
+    };
+
+    // Representations of the states which the motor can be in
+    enum class MotorState
+    {
+        STOPPED,
+        RUNNING,
+        ERROR
+    };
+
     // A data structure that contains all of the information to describe the connections to a given motor in the system
     class MotorProperties
     {
@@ -68,17 +83,11 @@ namespace RVR
     class Motor
     {
     private:
-        PwmPin In1Pwm; // A pin object that allows control of the IN1 pin of the motor controller
-        PwmPin In2Pwm; // A pin object that allows control of the IN2 pin of the motor controller
-        GpioPin I0Gpio; // A pin object that allows control of the I0 pin of the motor controller
-        GpioPin I1Gpio; // A pin object that allows control of the I1 pin of the motor controller
-        GpioPin I2Gpio; // A pin object that allows control of the I2 pin of the motor controller
-        GpioPin I3Gpio; // A pin object that allows control of the I3 pin of the motor controller
-        GpioPin I4Gpio; // A pin object that allows control of the I4 pin of the motor controller
-        GpioPin FaultGpio; // A pin object that allows reading from the FAULT pin the the motor controller
-        GpioPin SleepGpio; // A pin object that allows control of the SLEEP pin the the motor controller
-        GpioPin ResetGpio; // A pin object that allows control of the RESET pin the the motor controller
-        GpioPin DecayGpio; // A pin object that allows control of the DECAY pin the the motor controller
+        // The fixed properties for each motor in the rover product
+        static const MotorProperties *const drive1MotorMapping;
+        static const MotorProperties *const drive2MotorMapping;
+        static const MotorProperties *const treatMotorMapping;
+        static const MotorProperties *const cameraMotorMapping;
 
         // Helper function to set up the pin objects used for interfacing with the motor controller
         int setupPins();
@@ -96,14 +105,22 @@ namespace RVR
         int setCurrentLimit(int currentLimit);
 
     protected:
+        MotorState state;
+
         // stores the motor properties for the specific motor which an instance of this class represents
         const MotorProperties *motorProperties;
 
-        // The fixed properties for each motor in the rover product
-        static const MotorProperties *const drive1MotorMapping;
-        static const MotorProperties *const drive2MotorMapping;
-        static const MotorProperties *const treatMotorMapping;
-        static const MotorProperties *const cameraMotorMapping;
+        PwmPin *In1Pwm; // A pin object that allows control of the IN1 pin of the motor controller
+        GpioPin *In2Gpio; // A pin object that allows control of the IN2 pin of the motor controller
+        GpioPin *I0Gpio; // A pin object that allows control of the I0 pin of the motor controller
+        GpioPin *I1Gpio; // A pin object that allows control of the I1 pin of the motor controller
+        GpioPin *I2Gpio; // A pin object that allows control of the I2 pin of the motor controller
+        GpioPin *I3Gpio; // A pin object that allows control of the I3 pin of the motor controller
+        GpioPin *I4Gpio; // A pin object that allows control of the I4 pin of the motor controller
+        GpioPin *FaultGpio; // A pin object that allows reading from the FAULT pin the the motor controller
+        GpioPin *SleepGpio; // A pin object that allows control of the SLEEP pin the the motor controller
+        GpioPin *ResetGpio; // A pin object that allows control of the RESET pin the the motor controller
+        GpioPin *DecayGpio; // A pin object that allows control of the DECAY pin the the motor controller
 
     };
 
@@ -116,7 +133,17 @@ namespace RVR
     // Subclass to represent a DC motor (controlled by the DRV8842 chip)
     class DcMotor : public Motor
     {
+    private:
+        unsigned int rampTime;
+    public:
 
+        // Sets the ramp time in milliseconds
+        int setRampTime(unsigned int rampTime_ms);
+
+        // Target speed should be an integer between 1 and 100
+        int startMotor(int targetSpeedPercent, MotorDirection direction);
+
+        int stopMotor();
     };
 
 }

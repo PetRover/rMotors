@@ -3,6 +3,8 @@
 //
 
 #include "rMotors.h"
+#include <ctime>
+#include <unistd.h>
 
 
 namespace RVR
@@ -55,6 +57,10 @@ namespace RVR
                 break;
         }
         this->setupPins();
+
+        this->In1Pwm->setEnable(false);
+        this->In1Pwm->setPeriod(20000); // F_PWM recommended between 0 and 100KHz
+        this->state = MotorState::STOPPED;
     }
 
     RVR::PowerRail* motorRail = RVR::PowerManager::getRail(RVR::RAIL12V0);
@@ -73,43 +79,43 @@ namespace RVR
 
         if ((fiveBitValue & (1<<0)) != 0)
         {
-            this->I0Gpio.setValue(RVR::GpioValue::HIGH); // set gpio for I0 to high
+            this->I0Gpio->setValue(RVR::GpioValue::HIGH); // set gpio for I0 to high
         }
         else
         {
-            this->I0Gpio.setValue(GpioValue::LOW); // set gpio for I0 to low
+            this->I0Gpio->setValue(GpioValue::LOW); // set gpio for I0 to low
         }
         if ((fiveBitValue & (1<<1)) != 0)
         {
-            this->I1Gpio.setValue(GpioValue::HIGH); // set gpio for I1 to high
+            this->I1Gpio->setValue(GpioValue::HIGH); // set gpio for I1 to high
         }
         else
         {
-            this->I1Gpio.setValue(GpioValue::LOW); // set gpio for I1 to low
+            this->I1Gpio->setValue(GpioValue::LOW); // set gpio for I1 to low
         }
         if ((fiveBitValue & (1<<2)) != 0)
         {
-            this->I2Gpio.setValue(GpioValue::HIGH); // set gpio for I2 to high
+            this->I2Gpio->setValue(GpioValue::HIGH); // set gpio for I2 to high
         }
         else
         {
-            this->I2Gpio.setValue(GpioValue::LOW); // set gpio for I2 to low
+            this->I2Gpio->setValue(GpioValue::LOW); // set gpio for I2 to low
         }
         if ((fiveBitValue & (1<<3)) != 0)
         {
-            this->I3Gpio.setValue(GpioValue::HIGH); // set gpio for I3 to high
+            this->I3Gpio->setValue(GpioValue::HIGH); // set gpio for I3 to high
         }
         else
         {
-            this->I3Gpio.setValue(GpioValue::LOW); // set gpio for I3 to low
+            this->I3Gpio->setValue(GpioValue::LOW); // set gpio for I3 to low
         }
         if ((fiveBitValue & (1<<4)) != 0)
         {
-            this->I4Gpio.setValue(GpioValue::HIGH); // set gpio for I4 to high
+            this->I4Gpio->setValue(GpioValue::HIGH); // set gpio for I4 to high
         }
         else
         {
-            this->I4Gpio.setValue(GpioValue::LOW); // set gpio for I4 to low
+            this->I4Gpio->setValue(GpioValue::LOW); // set gpio for I4 to low
         }
 
         return 0;
@@ -117,18 +123,97 @@ namespace RVR
 
     int Motor::setupPins()
     {
-        this->In1Pwm = RVR::PwmPin(this->motorProperties->IN1);
-        this->In2Pwm = RVR::PwmPin(this->motorProperties->IN2);
-        this->I0Gpio = RVR::GpioPin(this->motorProperties->I0, GpioDirection::OUT);
-        this->I1Gpio = RVR::GpioPin(this->motorProperties->I1, GpioDirection::OUT);
-        this->I2Gpio = RVR::GpioPin(this->motorProperties->I2, GpioDirection::OUT);
-        this->I3Gpio = RVR::GpioPin(this->motorProperties->I3, GpioDirection::OUT);
-        this->I4Gpio = RVR::GpioPin(this->motorProperties->I4, GpioDirection::OUT);
-        this->FaultGpio = RVR::GpioPin(this->motorProperties->FAULT, GpioDirection::OUT);
-        this->SleepGpio = RVR::GpioPin(this->motorProperties->SLEEP, GpioDirection::OUT);
-        this->ResetGpio = RVR::GpioPin(this->motorProperties->RESET, GpioDirection::OUT);
-        this->DecayGpio = RVR::GpioPin(this->motorProperties->DECAY, GpioDirection::OUT);
+        this->In1Pwm = new RVR::PwmPin(this->motorProperties->IN1);
+        this->In2Gpio = new RVR::GpioPin(this->motorProperties->IN2, GpioDirection::OUT);
+        this->I0Gpio = new RVR::GpioPin(this->motorProperties->I0, GpioDirection::OUT);
+        this->I1Gpio = new RVR::GpioPin(this->motorProperties->I1, GpioDirection::OUT);
+        this->I2Gpio = new RVR::GpioPin(this->motorProperties->I2, GpioDirection::OUT);
+        this->I3Gpio = new RVR::GpioPin(this->motorProperties->I3, GpioDirection::OUT);
+        this->I4Gpio = new RVR::GpioPin(this->motorProperties->I4, GpioDirection::OUT);
+        this->FaultGpio = new RVR::GpioPin(this->motorProperties->FAULT, GpioDirection::OUT);
+        this->SleepGpio = new RVR::GpioPin(this->motorProperties->SLEEP, GpioDirection::OUT);
+        this->ResetGpio = new RVR::GpioPin(this->motorProperties->RESET, GpioDirection::OUT);
+        this->DecayGpio = new RVR::GpioPin(this->motorProperties->DECAY, GpioDirection::OUT);
 
         return 0;
+    }
+
+    int DcMotor::setRampTime(unsigned int rampTime_ms)
+    {
+        this->rampTime = rampTime_ms;
+
+        return 0;
+    }
+
+    int DcMotor::startMotor(int targetSpeedPercent, MotorDirection direction)
+    {
+        if (this->state != MotorState::STOPPED)
+        {
+            return 1; // 1 means that the motor was not started because it is currently in an invalid state
+        }
+
+        double pwmInPercent;
+        GpioValue gpioInValue;
+        int rampPolarity;
+        switch (direction)
+        {
+            case MotorDirection::FORWARD:
+                pwmInPercent = 0;
+                gpioInValue = GpioValue::LOW;
+                rampPolarity = 1;
+                break;
+            case MotorDirection::REVERSE:
+                pwmInPercent = 100;
+                gpioInValue = GpioValue::HIGH;
+                rampPolarity = -1;
+                break;
+        }
+
+
+        double pwmPercentPerRampStep;
+
+        // Prevent division by zero when ramp time is zero
+        if (this->rampTime > 0)
+        {
+            pwmPercentPerRampStep = (targetSpeedPercent / (double) this->rampTime);
+        }
+        else
+        {
+            pwmPercentPerRampStep = targetSpeedPercent;
+        }
+        std::clock_t rampStartTime = std::clock();
+
+        this->In1Pwm->setDutyCyclePercent(pwmInPercent);
+        this->In1Pwm->setEnable(true);
+        this->In2Gpio->setValue(gpioInValue);
+        do
+        {
+            pwmInPercent += rampPolarity * pwmPercentPerRampStep;
+            this->In1Pwm->setDutyCyclePercent(pwmInPercent);
+            usleep(1000);
+        }
+        while ((std::clock() - rampStartTime) * 1000 / (double) CLOCKS_PER_SEC <= this->rampTime);
+        printf("The error was %f", (targetSpeedPercent - pwmInPercent));
+        this->In1Pwm->setDutyCyclePercent(targetSpeedPercent);
+
+        this->state = MotorState::RUNNING;
+        return 0;
+    }
+
+    int DcMotor::stopMotor()
+    {
+        if (this->state == MotorState::RUNNING)
+        {
+            this->In2Gpio->setValue(GpioValue::LOW);
+            this->In1Pwm->setDutyCyclePercent(0);
+            this->In1Pwm->setEnable(false);
+
+            this->state = MotorState::STOPPED;
+            return 0;
+        }
+        else
+        {
+            return 1; // 1 means that the motor was not stopped because it is currently in an invalid state
+        }
     }
 }
