@@ -136,6 +136,7 @@ namespace RVR
     private:
         unsigned int rampTime;
     public:
+        DcMotor(MotorName motorName) : Motor(motorName) { };
 
         // Sets the ramp time in milliseconds
         int setRampTime(unsigned int rampTime_ms);
