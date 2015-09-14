@@ -38,7 +38,7 @@ namespace RVR
     };
 
     // Representation of the decay modes which the motor drivers can have
-    enum class MotorDacayMode
+    enum class MotorDecayMode
     {
         FAST, // Don't break
         SLOW // Break
@@ -121,7 +121,7 @@ namespace RVR
 
         int wake();
 
-        void setDecay(MotorDacayMode decayMode);
+        void setDecay(MotorDecayMode decayMode);
 
         bool readFault();
 

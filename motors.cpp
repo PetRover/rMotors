@@ -68,9 +68,9 @@ namespace RVR
     }
 
     RVR::PowerRail* motorRail = RVR::PowerManager::getRail(RVR::RAIL12V0);
-    const RVR::MotorProperties *const RVR::Motor::driveAMotorMapping = new RVR::MotorProperties(13, 35, 7, 6, 5, 4, 3,
-                                                                                                9, 10, 11, 8, motorRail,
-                                                                                                2500,
+    const RVR::MotorProperties *const RVR::Motor::driveAMotorMapping = new RVR::MotorProperties(13, 35, 14, 15, 16, 17,
+                                                                                                27, 9, 10, 11, 28,
+                                                                                                motorRail, 2500,
                                                                                                 250); //old (36, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, motorRail, 2500, 250);
     const RVR::MotorProperties *const RVR::Motor::driveBMotorMapping = new RVR::MotorProperties(1, 2, 3, 4, 5, 6, 7, 8,
                                                                                                 9, 10, 11, motorRail,
@@ -163,14 +163,14 @@ namespace RVR
         }
     }
 
-    void Motor::setDecay(MotorDacayMode decayMode)
+    void Motor::setDecay(MotorDecayMode decayMode)
     {
         switch (decayMode)
         {
-            case MotorDacayMode::FAST:
+            case MotorDecayMode::FAST:
                 this->DecayGpio->setValue(GpioValue::HIGH);
                 break;
-            case MotorDacayMode::SLOW:
+            case MotorDecayMode::SLOW:
                 this->DecayGpio->setValue(GpioValue::LOW);
                 break;
         }
@@ -183,13 +183,10 @@ namespace RVR
         {
             case GpioValue::HIGH:
                 return false;
-                break;
             case GpioValue::LOW:
                 return true;
-                break;
             case GpioValue::ERROR:
                 throw std::runtime_error("read from fault bit on motor driver failed");
-                break;
         }
     }
 
