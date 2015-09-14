@@ -4,7 +4,11 @@
 
 #include "rMotors.h"
 #include <chrono>
+
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "UnusedImportStatement"
 #include <unistd.h>
+#include <stdexcept>
 
 
 namespace RVR
@@ -43,11 +47,11 @@ namespace RVR
         // Assign the correct pin mapping for the motor
         switch (motorName)
         {
-            case RVR::DRIVE_MOTOR_1:
-                this->motorProperties = RVR::Motor::drive1MotorMapping;
+            case RVR::DRIVE_MOTOR_A:
+                this->motorProperties = RVR::Motor::driveAMotorMapping;
                 break;
-            case RVR::DRIVE_MOTOR_2:
-                this->motorProperties = RVR::Motor::drive2MotorMapping;
+            case RVR::DRIVE_MOTOR_B:
+                this->motorProperties = RVR::Motor::driveBMotorMapping;
                 break;
             case RVR::TREAT_MOTOR:
                 this->motorProperties = RVR::Motor::treatMotorMapping;
@@ -64,14 +68,18 @@ namespace RVR
     }
 
     RVR::PowerRail* motorRail = RVR::PowerManager::getRail(RVR::RAIL12V0);
-    const RVR::MotorProperties *const RVR::Motor::drive1MotorMapping = new RVR::MotorProperties(36, 2, 3, 4, 5, 7, 8, 9,
-                                                                                                10, 11, 12, motorRail,
+    const RVR::MotorProperties *const RVR::Motor::driveAMotorMapping = new RVR::MotorProperties(13, 35, 7, 6, 5, 4, 3,
+                                                                                                9, 10, 11, 8, motorRail,
+                                                                                                2500,
+                                                                                                250); //old (36, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, motorRail, 2500, 250);
+    const RVR::MotorProperties *const RVR::Motor::driveBMotorMapping = new RVR::MotorProperties(1, 2, 3, 4, 5, 6, 7, 8,
+                                                                                                9, 10, 11, motorRail,
                                                                                                 2500, 250);
-    const RVR::MotorProperties * const RVR::Motor::drive2MotorMapping = new RVR::MotorProperties(1, 2, 3, 4, 5, 6, 7, 8, 9, 10 ,11, motorRail, 2500, 250);
     const RVR::MotorProperties * const RVR::Motor::treatMotorMapping = new RVR::MotorProperties(1, 2, 3, 4, 5, 6, 7, 8, 9, 10 ,11, motorRail, 2500, 250);
     const RVR::MotorProperties * const RVR::Motor::cameraMotorMapping = new RVR::MotorProperties(1, 2, 3, 4, 5, 6, 7, 8, 9, 10 ,11, motorRail, 2500, 250);
 
-    int Motor::setCurrentLimit(int currentLimit) {
+    void Motor::setCurrentLimit(int currentLimit)
+    {
         if (currentLimit > this->motorProperties->I_FULL_SCALE)
         {
             currentLimit = this->motorProperties->I_FULL_SCALE;
@@ -119,8 +127,70 @@ namespace RVR
         {
             this->I4Gpio->setValue(GpioValue::LOW); // set gpio for I4 to low
         }
+    }
 
-        return 0;
+
+    void Motor::reset()
+    {
+        this->state = MotorState::RESET;
+        this->ResetGpio->setValue(GpioValue::LOW);
+        usleep(2000);
+        this->stopMotor();
+        this->ResetGpio->setValue(GpioValue::HIGH);
+        usleep(2000);
+        this->state = MotorState::STOPPED;
+    }
+
+    void Motor::sleep()
+    {
+        this->state = MotorState::SLEEP;
+        this->SleepGpio->setValue(GpioValue::LOW);
+        this->stopMotor();
+    }
+
+    int Motor::wake()
+    {
+        if (this->state == MotorState::SLEEP)
+        {
+            this->SleepGpio->setValue(GpioValue::HIGH);
+            usleep(2000);
+            this->state = MotorState::STOPPED;
+            return 0;
+        }
+        else
+        {
+            return 1; // The wake did not occur because the motor is not in a valid state
+        }
+    }
+
+    void Motor::setDecay(MotorDacayMode decayMode)
+    {
+        switch (decayMode)
+        {
+            case MotorDacayMode::FAST:
+                this->DecayGpio->setValue(GpioValue::HIGH);
+                break;
+            case MotorDacayMode::SLOW:
+                this->DecayGpio->setValue(GpioValue::LOW);
+                break;
+        }
+    }
+
+    bool Motor::readFault()
+    {
+        GpioValue faultBit = this->FaultGpio->getValue();
+        switch (faultBit)
+        {
+            case GpioValue::HIGH:
+                return false;
+                break;
+            case GpioValue::LOW:
+                return true;
+                break;
+            case GpioValue::ERROR:
+                throw std::runtime_error("read from fault bit on motor driver failed");
+                break;
+        }
     }
 
     int Motor::setupPins()
@@ -232,3 +302,5 @@ namespace RVR
         }
     }
 }
+
+#pragma clang diagnostic pop

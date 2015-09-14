@@ -14,8 +14,8 @@ namespace RVR
     // Representations of the motors in the rover product
     enum MotorName
     {
-        DRIVE_MOTOR_1, // Wheel drive motor #1
-        DRIVE_MOTOR_2, // Wheel drive motor #2
+        DRIVE_MOTOR_A, // Wheel drive motor #1
+        DRIVE_MOTOR_B, // Wheel drive motor #2
         CAMERA_MOTOR, // Camera articulation motor
         TREAT_MOTOR // Treat dispenser motor
     };
@@ -32,7 +32,16 @@ namespace RVR
     {
         STOPPED,
         RUNNING,
+        SLEEP,
+        RESET,
         ERROR
+    };
+
+    // Representation of the decay modes which the motor drivers can have
+    enum class MotorDacayMode
+    {
+        FAST, // Don't break
+        SLOW // Break
     };
 
     // A data structure that contains all of the information to describe the connections to a given motor in the system
@@ -84,8 +93,8 @@ namespace RVR
     {
     private:
         // The fixed properties for each motor in the rover product
-        static const MotorProperties *const drive1MotorMapping;
-        static const MotorProperties *const drive2MotorMapping;
+        static const MotorProperties *const driveAMotorMapping;
+        static const MotorProperties *const driveBMotorMapping;
         static const MotorProperties *const treatMotorMapping;
         static const MotorProperties *const cameraMotorMapping;
 
@@ -102,7 +111,19 @@ namespace RVR
         /*!
           \param current limit (in mA)
         */
-        int setCurrentLimit(int currentLimit);
+        void setCurrentLimit(int currentLimit);
+
+        virtual int stopMotor() = 0;
+
+        void reset();
+
+        void sleep();
+
+        int wake();
+
+        void setDecay(MotorDacayMode decayMode);
+
+        bool readFault();
 
     protected:
         MotorState state;
