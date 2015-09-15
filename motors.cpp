@@ -188,16 +188,16 @@ namespace RVR
     int Motor::setupPins()
     {
         this->In1Pwm = new RVR::PwmPin(this->motorProperties->IN1);
-        this->In2Gpio = new RVR::GpioPin(this->motorProperties->IN2, GpioDirection::OUT);
-        this->I0Gpio = new RVR::GpioPin(this->motorProperties->I0, GpioDirection::OUT);
-        this->I1Gpio = new RVR::GpioPin(this->motorProperties->I1, GpioDirection::OUT);
-        this->I2Gpio = new RVR::GpioPin(this->motorProperties->I2, GpioDirection::OUT);
-        this->I3Gpio = new RVR::GpioPin(this->motorProperties->I3, GpioDirection::OUT);
-        this->I4Gpio = new RVR::GpioPin(this->motorProperties->I4, GpioDirection::OUT);
-        this->FaultGpio = new RVR::GpioPin(this->motorProperties->FAULT, GpioDirection::OUT);
-        this->SleepGpio = new RVR::GpioPin(this->motorProperties->SLEEP, GpioDirection::OUT);
-        this->ResetGpio = new RVR::GpioPin(this->motorProperties->RESET, GpioDirection::OUT);
-        this->DecayGpio = new RVR::GpioPin(this->motorProperties->DECAY, GpioDirection::OUT);
+        this->In2Gpio = new RVR::GpioPin(this->motorProperties->IN2);
+        this->I0Gpio = new RVR::GpioPin(this->motorProperties->I0);
+        this->I1Gpio = new RVR::GpioPin(this->motorProperties->I1);
+        this->I2Gpio = new RVR::GpioPin(this->motorProperties->I2);
+        this->I3Gpio = new RVR::GpioPin(this->motorProperties->I3);
+        this->I4Gpio = new RVR::GpioPin(this->motorProperties->I4);
+        this->FaultGpio = new RVR::GpioPin(this->motorProperties->FAULT);
+        this->SleepGpio = new RVR::GpioPin(this->motorProperties->SLEEP);
+        this->ResetGpio = new RVR::GpioPin(this->motorProperties->RESET);
+        this->DecayGpio = new RVR::GpioPin(this->motorProperties->DECAY);
 
         return 0;
     }
