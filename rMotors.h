@@ -165,6 +165,8 @@ namespace RVR
         // Target speed should be an integer between 1 and 100
         int startMotor(int targetSpeedPercent, MotorDirection direction);
 
+        double getSpeed();
+
         int stopMotor();
     };
 
