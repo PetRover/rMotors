@@ -8,6 +8,10 @@
 #include <string>
 #include "rPower.h"
 #include "pins.h"
+#include <chrono>
+#include <unistd.h>
+#include <stdexcept>
+#include "../rCore/easylogging++.h"
 
 namespace RVR
 {
@@ -44,17 +48,11 @@ namespace RVR
         SLOW // Break
     };
 
-    // A data structure that contains all of the information to describe the connections to a given motor in the system
-    class MotorProperties
+    // Base class for motor objects
+    class DRV88XXMotor
     {
-    public:
-        int IN1; // pin value for IN1
-        int IN2; // pin value for IN2
-        int I0; // pin value for I0
-        int I1; // pin value for I1
-        int I2; // pin value for I2
-        int I3; // pin value for I3
-        int I4; // pin value for I4
+    protected:
+
         int FAULT; // pin value for FAULT
         int SLEEP; // pin value for SLEEP
         int RESET; // pin value for RESET
@@ -64,54 +62,18 @@ namespace RVR
         int R_SENSE; // value (in mOhm) of the sense resistor
         int I_FULL_SCALE; // maximum value (in mA) of the chopping current
 
-        MotorProperties() { }
-
-        //! All arguments constructor
-        /*!
-          \param in1 pin value for IN1
-          \param in2 pin value for IN2
-          \param i0 pin value for I0
-          \param i1 pin value for I1
-          \param i2 pin value for I2
-          \param i3 pin value for I3
-          \param i4 pin value for I4
-          \param fault pin value for FAULT
-          \param sleep pin value for SLEEP
-          \param reset pin value for RESET
-          \param decay pin value for DECAY
-          \param powerRail pointer to the power rail that the motor runs off of
-          \param vRef value (in mV) of the reference voltage
-          \param vRef value (in mOhm) of the sense resistor
-        */
-        MotorProperties(int in1, int in2, int i0, int i1, int i2, int i3, int i4, int fault, int sleep, int reset,
-                        int decay, RVR::PowerRail *powerRail, int vRef, int rSense);
-    };
-
-
-    // Base class for motor objects
-    class Motor
-    {
-    private:
-        // The fixed properties for each motor in the rover product
-        static const MotorProperties *const driveAMotorMapping;
-        static const MotorProperties *const driveBMotorMapping;
-        static const MotorProperties *const treatMotorMapping;
-        static const MotorProperties *const cameraMotorMapping;
-
-        // Helper function to set up the pin objects used for interfacing with the motor controller
-        int setupPins();
-
     public:
-        Motor() { }
+        std::string name;
 
-        // Initializes a motor object corresponding to the motor name given
-        Motor(MotorName motorName);
+        DRV88XXMotor() { }
+
+        DRV88XXMotor(int fault, int sleep, int reset, int decay, RVR::PowerRail *powerRail, int vRef, int rSense, std::string name);
 
         //! Sets the current limit of the motor
         /*!
           \param current limit (in mA)
         */
-        void setCurrentLimit(int currentLimit);
+        virtual void setCurrentLimit(int currentLimit) = 0;
 
         virtual int stopMotor() = 0;
 
@@ -128,16 +90,6 @@ namespace RVR
     protected:
         MotorState state;
 
-        // stores the motor properties for the specific motor which an instance of this class represents
-        const MotorProperties *motorProperties;
-
-        PwmPin *In1Pwm; // A pin object that allows control of the IN1 pin of the motor controller
-        GpioPin *In2Gpio; // A pin object that allows control of the IN2 pin of the motor controller
-        GpioPin *I0Gpio; // A pin object that allows control of the I0 pin of the motor controller
-        GpioPin *I1Gpio; // A pin object that allows control of the I1 pin of the motor controller
-        GpioPin *I2Gpio; // A pin object that allows control of the I2 pin of the motor controller
-        GpioPin *I3Gpio; // A pin object that allows control of the I3 pin of the motor controller
-        GpioPin *I4Gpio; // A pin object that allows control of the I4 pin of the motor controller
         GpioPin *FaultGpio; // A pin object that allows reading from the FAULT pin the the motor controller
         GpioPin *SleepGpio; // A pin object that allows control of the SLEEP pin the the motor controller
         GpioPin *ResetGpio; // A pin object that allows control of the RESET pin the the motor controller
@@ -146,18 +98,67 @@ namespace RVR
     };
 
     // Subclass to represent a stepper motor (controlled by the DRV8843 chip)
-    class StepperMotor : public Motor
+    class DRV8843Motor : public DRV88XXMotor
     {
+    private:
+        void init(int aIn1, int aIn2, int bIn1, int bIn2, int aI0, int aI1, int bI0, int bI1);
+
+        PwmPin *aIn1Pwm; // A pin object that allows control of the BIN1 pin of the motor controller
+        GpioPin *aIn2Gpio; // A pin object that allows control of the BIN2 pin of the motor controller
+        PwmPin *bIn1Pwm; // A pin object that allows control of the BIN1 pin of the motor controller
+        GpioPin *bIn2Gpio; // A pin object that allows control of the BIN2 pin of the motor controller
+        GpioPin *aI0Gpio; // A pin object that allows control of the AI0 pin of the motor controller
+        GpioPin *aI1Gpio; // A pin object that allows control of the AI1 pin of the motor controller
+        GpioPin *bI0Gpio; // A pin object that allows control of the BI0 pin of the motor controller
+        GpioPin *bI1Gpio; // A pin object that allows control of the BI1 pin of the motor controller
+
+    public:
+
+        //! All arguments constructor
+        /*!
+          \param powerRail pointer to the power rail that the motor runs off of
+          \param vRef value (in mV) of the reference voltage
+          \param vRef value (in mOhm) of the sense resistor
+        */
+        DRV8843Motor(int aIn1, int aIn2, int bIn1, int bIn2, int aI0, int aI1, int bI0, int bI1, int fault, int sleep, int reset,
+                          int decay, RVR::PowerRail *powerRail, int vRef, int rSense);
+        DRV8843Motor(int aIn1, int aIn2, int bIn1, int bIn2, int aI0, int aI1, int bI0, int bI1, int fault, int sleep, int reset,
+                     int decay, RVR::PowerRail *powerRail, int vRef, int rSense, std::string name);
+
+        void setCurrentLimit(int currentLimit);
+        int startMotor(){return -1;};
+        int stopMotor(){return -1;};
 
     };
 
     // Subclass to represent a DC motor (controlled by the DRV8842 chip)
-    class DcMotor : public Motor
+    class DRV8842Motor : public DRV88XXMotor
     {
     private:
+        void init(int in1, int in2, int i0, int i1, int i2, int i3, int i4);
+
+        PwmPin *In1Pwm; // A pin object that allows control of the IN1 pin of the motor controller
+        GpioPin *In2Gpio; // A pin object that allows control of the IN2 pin of the motor controller
+        GpioPin *I0Gpio; // A pin object that allows control of the I0 pin of the motor controller
+        GpioPin *I1Gpio; // A pin object that allows control of the I1 pin of the motor controller
+        GpioPin *I2Gpio; // A pin object that allows control of the I2 pin of the motor controller
+        GpioPin *I3Gpio; // A pin object that allows control of the I3 pin of the motor controller
+        GpioPin *I4Gpio; // A pin object that allows control of the I4 pin of the motor controller
+
         unsigned int rampTime = 0;
     public:
-        DcMotor(MotorName motorName) : Motor(motorName) { };
+        //! All arguments constructor
+        /*!
+          \param powerRail pointer to the power rail that the motor runs off of
+          \param vRef value (in mV) of the reference voltage
+          \param vRef value (in mOhm) of the sense resistor
+        */
+        DRV8842Motor(int in1, int in2, int i0, int i1, int i2, int i3, int i4, int fault, int sleep, int reset,
+                     int decay, RVR::PowerRail *powerRail, int vRef, int rSense);
+        DRV8842Motor(int in1, int in2, int i0, int i1, int i2, int i3, int i4, int fault, int sleep, int reset,
+                     int decay, RVR::PowerRail *powerRail, int vRef, int rSense, std::string name);
+
+        void setCurrentLimit(int currentLimit);
 
         // Sets the ramp time in milliseconds
         int setRampTime(unsigned int rampTime_ms);

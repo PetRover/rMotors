@@ -3,130 +3,32 @@
 //
 
 #include "rMotors.h"
-#include <chrono>
-
-#pragma clang diagnostic push
-#pragma ide diagnostic ignored "UnusedImportStatement"
-
-#include <unistd.h>
-#include <stdexcept>
-
 
 namespace RVR
 {
-
     // ==============================================================
-    // MotorProperties Class Member functions
+    // DRV88XXMotor Class Member functions
     // ==============================================================
 
-    RVR::MotorProperties::MotorProperties(int in1, int in2, int i0, int i1, int i2, int i3, int i4, int fault, int sleep, int reset, int decay, RVR::PowerRail *powerRail, int vRef, int rSense)
+    DRV88XXMotor::DRV88XXMotor(int fault, int sleep, int reset, int decay, RVR::PowerRail *powerRail, int vRef, int rSense, std::string name)
     {
-        this->IN1 = in1;
-        this->IN2 = in2;
-        this->I0 = i0;
-        this->I1 = i1;
-        this->I2 = i2;
-        this->I3 = i3;
-        this->I4 = i4;
-        this->FAULT = fault;
-        this->SLEEP = sleep;
-        this->RESET = reset;
-        this->DECAY = decay;
         this->POWER_RAIL = powerRail;
         this->V_REF = vRef;
         this->R_SENSE = rSense;
         this->I_FULL_SCALE = this->V_REF / (5 * this->R_SENSE) * 1000;
+
+        this->name = name;
+
+        this->FaultGpio = new GpioPin(fault);
+        this->SleepGpio = new GpioPin(sleep);
+        this->ResetGpio = new GpioPin(reset);
+        this->DecayGpio = new GpioPin(decay);
+
     }
 
-    // ==============================================================
-    // Motor Class Member functions
-    // ==============================================================
-
-    RVR::Motor::Motor(RVR::MotorName motorName)
+    void DRV88XXMotor::reset()
     {
-        // Assign the correct pin mapping for the motor
-        switch (motorName)
-        {
-            case RVR::DRIVE_MOTOR_A:
-                this->motorProperties = RVR::Motor::driveAMotorMapping;
-                break;
-            case RVR::DRIVE_MOTOR_B:
-                this->motorProperties = RVR::Motor::driveBMotorMapping;
-                break;
-            case RVR::TREAT_MOTOR:
-                this->motorProperties = RVR::Motor::treatMotorMapping;
-                break;
-            case RVR::CAMERA_MOTOR:
-                this->motorProperties = RVR::Motor::cameraMotorMapping;
-                break;
-        }
-        this->setupPins();
-
-        this->In1Pwm->setEnable(false);
-        this->In1Pwm->setPeriod(1000000); // F_PWM recommended between 0 and 100KHz TODO fix this PWM frequency
-        this->state = MotorState::STOPPED;
-    }
-
-    RVR::PowerRail *motorRail = RVR::PowerManager::getRail(RVR::RAIL12V0);
-    const RVR::MotorProperties *const RVR::Motor::driveAMotorMapping = new RVR::MotorProperties(13, 35, 14, 15, 16, 17, 27, 9, 10, 11, 28, motorRail, 2500, 250); //old (36, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, motorRail, 2500, 250);
-    const RVR::MotorProperties *const RVR::Motor::driveBMotorMapping = new RVR::MotorProperties(62, 61, 44, 86, 47, 46, 27, 67, 69, 68, 45, motorRail, 2500, 250);
-    const RVR::MotorProperties *const RVR::Motor::treatMotorMapping = new RVR::MotorProperties(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, motorRail, 2500, 250);
-    const RVR::MotorProperties *const RVR::Motor::cameraMotorMapping = new RVR::MotorProperties(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, motorRail, 2500, 250);
-
-    void Motor::setCurrentLimit(int currentLimit)
-    {
-        if (currentLimit > this->motorProperties->I_FULL_SCALE)
-        {
-            currentLimit = this->motorProperties->I_FULL_SCALE;
-        }
-        int percentOfFullScale = (currentLimit * 100) / this->motorProperties->I_FULL_SCALE;
-        int fiveBitValue = (percentOfFullScale * 100) * 31 / 10000;
-
-        if ((fiveBitValue & (1 << 0)) != 0)
-        {
-            this->I0Gpio->setValue(RVR::GpioValue::HIGH); // set gpio for I0 to high
-        }
-        else
-        {
-            this->I0Gpio->setValue(GpioValue::LOW); // set gpio for I0 to low
-        }
-        if ((fiveBitValue & (1 << 1)) != 0)
-        {
-            this->I1Gpio->setValue(GpioValue::HIGH); // set gpio for I1 to high
-        }
-        else
-        {
-            this->I1Gpio->setValue(GpioValue::LOW); // set gpio for I1 to low
-        }
-        if ((fiveBitValue & (1 << 2)) != 0)
-        {
-            this->I2Gpio->setValue(GpioValue::HIGH); // set gpio for I2 to high
-        }
-        else
-        {
-            this->I2Gpio->setValue(GpioValue::LOW); // set gpio for I2 to low
-        }
-        if ((fiveBitValue & (1 << 3)) != 0)
-        {
-            this->I3Gpio->setValue(GpioValue::HIGH); // set gpio for I3 to high
-        }
-        else
-        {
-            this->I3Gpio->setValue(GpioValue::LOW); // set gpio for I3 to low
-        }
-        if ((fiveBitValue & (1 << 4)) != 0)
-        {
-            this->I4Gpio->setValue(GpioValue::HIGH); // set gpio for I4 to high
-        }
-        else
-        {
-            this->I4Gpio->setValue(GpioValue::LOW); // set gpio for I4 to low
-        }
-    }
-
-
-    void Motor::reset()
-    {
+        VLOG(1) << "Resetting motor <" << this->name << ">";
         this->state = MotorState::RESET;
         this->ResetGpio->setValue(GpioValue::LOW);
         usleep(2000);
@@ -134,85 +36,256 @@ namespace RVR
         this->ResetGpio->setValue(GpioValue::HIGH);
         usleep(2000);
         this->state = MotorState::STOPPED;
+        VLOG(1) << "Motor is now reset and in STOPPED state <" << this->name << ">";
     }
 
-    void Motor::sleep()
+    void DRV88XXMotor::sleep()
     {
+        VLOG(1) << "Putting motor to sleep <" << this->name << ">";
         this->state = MotorState::SLEEP;
         this->SleepGpio->setValue(GpioValue::LOW);
         this->stopMotor();
+        VLOG(1) << "Motor is not asleep and in the STOPPED state <" << this->name << ">";
     }
 
-    int Motor::wake()
+    int DRV88XXMotor::wake()
     {
+        VLOG(1) << "Waking motor up <" << this->name << ">";
         if (this->state == MotorState::SLEEP)
         {
             this->SleepGpio->setValue(GpioValue::HIGH);
             usleep(2000);
             this->state = MotorState::STOPPED;
+            VLOG(1) << "Motor is now awake <" << this->name << ">";
             return 0;
         }
         else
         {
+            LOG(WARNING) << "Wake did nto occur because the motor was not in a valid state <" << this->name << ">";
             return 1; // The wake did not occur because the motor is not in a valid state
         }
     }
 
-    void Motor::setDecay(MotorDecayMode decayMode)
+    void DRV88XXMotor::setDecay(MotorDecayMode decayMode)
     {
         switch (decayMode)
         {
             case MotorDecayMode::FAST:
+                VLOG(1) << "Setting motor decay mode to 'FAST' <" << this->name << ">";
                 this->DecayGpio->setValue(GpioValue::HIGH);
                 break;
             case MotorDecayMode::SLOW:
+                VLOG(1) << "Setting motor decay mode to 'SLOW' <" << this->name << ">";
                 this->DecayGpio->setValue(GpioValue::LOW);
                 break;
         }
     }
 
-    bool Motor::readFault()
+    bool DRV88XXMotor::readFault()
     {
+        VLOG(3) << "Reading fault from motor <" << this->name << ">";
         GpioValue faultBit = this->FaultGpio->getValue();
         switch (faultBit)
         {
             case GpioValue::HIGH:
+                VLOG(3) << "No fault found <" << this->name << ">";
                 return false;
             case GpioValue::LOW:
+                LOG(WARNING) << "Motor had a fault... Please investigate <" << this->name << ">";
                 return true;
             case GpioValue::ERROR:
                 throw std::runtime_error("read from fault bit on motor driver failed");
         }
     }
 
-    int Motor::setupPins()
-    {
-        this->In1Pwm = new RVR::PwmPin(this->motorProperties->IN1);
-        this->In2Gpio = new RVR::GpioPin(this->motorProperties->IN2);
-        this->I0Gpio = new RVR::GpioPin(this->motorProperties->I0);
-        this->I1Gpio = new RVR::GpioPin(this->motorProperties->I1);
-        this->I2Gpio = new RVR::GpioPin(this->motorProperties->I2);
-        this->I3Gpio = new RVR::GpioPin(this->motorProperties->I3);
-        this->I4Gpio = new RVR::GpioPin(this->motorProperties->I4);
-        this->FaultGpio = new RVR::GpioPin(this->motorProperties->FAULT);
-        this->SleepGpio = new RVR::GpioPin(this->motorProperties->SLEEP);
-        this->ResetGpio = new RVR::GpioPin(this->motorProperties->RESET);
-        this->DecayGpio = new RVR::GpioPin(this->motorProperties->DECAY);
+    // ==============================================================
+    // DRV8843Motor Class Member functions
+    // ==============================================================
 
-        return 0;
+
+    void DRV8843Motor::init(int aIn1, int aIn2, int bIn1, int bIn2, int aI0, int aI1, int bI0, int bI1)
+    {
+        VLOG(1) << "Initializing motor [STEPPER] <" << this->name << ">";
+
+        this->aIn1Pwm = new PwmPin(aIn1);
+        this->aIn2Gpio = new GpioPin(aIn2);
+        this->bIn1Pwm = new PwmPin(bIn1);
+        this->bIn2Gpio = new GpioPin(bIn2);
+        this->aI0Gpio = new GpioPin(aI0);
+        this->aI1Gpio = new GpioPin(aI1);
+        this->bI1Gpio = new GpioPin(bI0);
+        this->bI0Gpio = new GpioPin(bI1);
+
+        this->aIn1Pwm->setEnable(false);
+        this->bIn1Pwm->setEnable(false);
+        VLOG(2) << "Setting PWM frequency to 1000000 <" << this->name << ">";
+        this->aIn1Pwm->setPeriod(1000000); // F_PWM recommended between 0 and 100KHz TODO fix this PWM frequency
+        this->bIn1Pwm->setPeriod(1000000); // F_PWM recommended between 0 and 100KHz TODO fix this PWM frequency
+        this->state = MotorState::STOPPED;
+        VLOG(1) << "Motor initialized [STEPPER] <" << this->name << ">";
     }
 
-    int DcMotor::setRampTime(unsigned int rampTime_ms)
+    DRV8843Motor::DRV8843Motor(int aIn1, int aIn2, int bIn1, int bIn2, int aI0, int aI1, int bI0, int bI1, int fault, int sleep, int reset, int decay, RVR::PowerRail *powerRail, int vRef, int rSense)
+    : DRV88XXMotor(fault, sleep, reset, decay, powerRail, vRef, rSense, "NONE")
     {
+        this->init(aIn1, aIn2, bIn1, bIn2, aI0, aI1, bI0, bI1);
+    }
+
+    DRV8843Motor::DRV8843Motor(int aIn1, int aIn2, int bIn1, int bIn2, int aI0, int aI1, int bI0, int bI1, int fault, int sleep, int reset, int decay, RVR::PowerRail *powerRail, int vRef, int rSense, std::string name)
+    : DRV88XXMotor(fault, sleep, reset, decay, powerRail, vRef, rSense, name)
+    {
+        this->init(aIn1, aIn2, bIn1, bIn2, aI0, aI1, bI0, bI1);
+    }
+
+
+    void DRV8843Motor::setCurrentLimit(int currentLimit)
+    {
+
+        if (currentLimit > this->I_FULL_SCALE)
+        {
+            currentLimit = this->I_FULL_SCALE;
+        }
+        int percentOfFullScale = (currentLimit * 100) / this->I_FULL_SCALE;
+        VLOG(1) << "Setting motor current limit to" << percentOfFullScale << "% (" << currentLimit << "mA) <" <<
+                this->name << ">";
+        int twoBitValue = (percentOfFullScale * 100) * 3 / 10000;
+
+        if ((twoBitValue & (1 << 0)) != 0)
+        {
+            VLOG(3) << "Settign aI0 and bI0 HIGH <" << this->name << ">";
+            this->aI0Gpio->setValue(GpioValue::HIGH); // set gpio for aI0 to high
+            this->bI0Gpio->setValue(GpioValue::HIGH); // set gpio for bI0 to high
+        }
+        else
+        {
+            VLOG(3) << "Settign aI0 and bI0 LOW <" << this->name << ">";
+            this->aI0Gpio->setValue(GpioValue::LOW); // set gpio for aI0 to low
+            this->bI0Gpio->setValue(GpioValue::LOW); // set gpio for bI0 to low
+        }
+        if ((twoBitValue & (1 << 1)) != 0)
+        {
+            VLOG(3) << "Settign aI1 and bI1 HIGH <" << this->name << ">";
+            this->aI1Gpio->setValue(GpioValue::HIGH); // set gpio for aI1 to high
+            this->bI1Gpio->setValue(GpioValue::HIGH); // set gpio for bI1 to high
+        }
+        else
+        {
+            VLOG(3) << "Settign aI1 and bI1 LOW <" << this->name << ">";
+            this->aI1Gpio->setValue(GpioValue::LOW); // set gpio for aI1 to low
+            this->bI1Gpio->setValue(GpioValue::LOW); // set gpio for bI1 to low
+        }
+    }
+
+    // ==============================================================
+    // DRV8842Motor Class Member functions
+    // ==============================================================
+    void DRV8842Motor::init(int in1, int in2, int i0, int i1, int i2, int i3, int i4)
+    {
+        VLOG(1) << "Initializing motor [DC] <" << this->name << ">";
+        this->In1Pwm = new PwmPin(in1);
+        this->In2Gpio = new GpioPin(in2);
+        this->I0Gpio = new GpioPin(i0);
+        this->I1Gpio = new GpioPin(i1);
+        this->I2Gpio = new GpioPin(i2);
+        this->I3Gpio = new GpioPin(i3);
+        this->I4Gpio = new GpioPin(i4);
+
+        this->In1Pwm->setEnable(false);
+        VLOG(2) << "Setting PWM frequency to 1000000 <" << this->name << ">";
+        this->In1Pwm->setPeriod(1000000); // F_PWM recommended between 0 and 100KHz TODO fix this PWM frequency
+        this->state = MotorState::STOPPED;
+        VLOG(1) << "Motor initialized [DC] <" << name << ">";
+    }
+
+    DRV8842Motor::DRV8842Motor(int in1, int in2, int i0, int i1, int i2, int i3, int i4, int fault, int sleep, int reset, int decay, RVR::PowerRail *powerRail, int vRef, int rSense)
+    : DRV88XXMotor(fault, sleep, reset, decay, powerRail, vRef, rSense, "NONE")
+    {
+        this->init(in1, in2, i0, i1, i2, i3, i4);
+    }
+
+    DRV8842Motor::DRV8842Motor(int in1, int in2, int i0, int i1, int i2, int i3, int i4, int fault, int sleep, int reset, int decay, RVR::PowerRail *powerRail, int vRef, int rSense, std::string name)
+    : DRV88XXMotor(fault, sleep, reset, decay, powerRail, vRef, rSense, name)
+    {
+        this->init(in1, in2, i0, i1, i2, i3, i4);
+    }
+
+    void DRV8842Motor::setCurrentLimit(int currentLimit)
+    {
+        if (currentLimit > this->I_FULL_SCALE)
+        {
+            currentLimit = this->I_FULL_SCALE;
+        }
+        int percentOfFullScale = (currentLimit * 100) / this->I_FULL_SCALE;
+        VLOG(1) << "Setting motor current limit to" << percentOfFullScale << "% (" << currentLimit << "mA) <" <<
+                this->name << ">";
+        int fiveBitValue = (percentOfFullScale * 100) * 31 / 10000;
+
+        if ((fiveBitValue & (1 << 0)) != 0)
+        {
+            VLOG(3) << "Settign I0 HIGH <" << this->name << ">";
+            this->I0Gpio->setValue(GpioValue::HIGH); // set gpio for I0 to high
+        }
+        else
+        {
+            VLOG(3) << "Settign I0 LOW <" << this->name << ">";
+            this->I0Gpio->setValue(GpioValue::LOW); // set gpio for I0 to low
+        }
+        if ((fiveBitValue & (1 << 1)) != 0)
+        {
+            VLOG(3) << "Settign I1 HIGH <" << this->name << ">";
+            this->I1Gpio->setValue(GpioValue::HIGH); // set gpio for I1 to high
+        }
+        else
+        {
+            VLOG(3) << "Settign I1 LOW <" << this->name << ">";
+            this->I1Gpio->setValue(GpioValue::LOW); // set gpio for I1 to low
+        }
+        if ((fiveBitValue & (1 << 2)) != 0)
+        {
+            VLOG(3) << "Settign I2 HIGH <" << this->name << ">";
+            this->I2Gpio->setValue(GpioValue::HIGH); // set gpio for I2 to high
+        }
+        else
+        {
+            VLOG(3) << "Settign I2 LOW <" << this->name << ">";
+            this->I2Gpio->setValue(GpioValue::LOW); // set gpio for I2 to low
+        }
+        if ((fiveBitValue & (1 << 3)) != 0)
+        {
+            VLOG(3) << "Settign I3 HIGH <" << this->name << ">";
+            this->I3Gpio->setValue(GpioValue::HIGH); // set gpio for I3 to high
+        }
+        else
+        {
+            VLOG(3) << "Settign I3 LOW <" << this->name << ">";
+            this->I3Gpio->setValue(GpioValue::LOW); // set gpio for I3 to low
+        }
+        if ((fiveBitValue & (1 << 4)) != 0)
+        {
+            VLOG(3) << "Settign I4 HIGH <" << this->name << ">";
+            this->I4Gpio->setValue(GpioValue::HIGH); // set gpio for I4 to high
+        }
+        else
+        {
+            VLOG(3) << "Settign I4 LOW <" << this->name << ">";
+            this->I4Gpio->setValue(GpioValue::LOW); // set gpio for I4 to low
+        }
+    }
+
+    int DRV8842Motor::setRampTime(unsigned int rampTime_ms)
+    {
+        VLOG(1) << "Setting motor ramp time to " << rampTime_ms << " (ms) <" << this->name << ">";
         this->rampTime = rampTime_ms;
 
         return 0;
     }
 
-    int DcMotor::startMotor(int targetSpeedPercent, MotorDirection direction)
+    int DRV8842Motor::startMotor(int targetSpeedPercent, MotorDirection direction)
     {
+        VLOG(1) << "Starting motor <" << this->name << ">";
         if (this->state != MotorState::STOPPED)
         {
+            LOG(WARNING) << "Motor failed to start because the state was invlaid <" << this->name << ">";
             return 1; // 1 means that the motor was not started because it is currently in an invalid state
         }
 
@@ -222,11 +295,13 @@ namespace RVR
         switch (direction)
         {
             case MotorDirection::FORWARD:
+                VLOG(2) << "Motor direction will be FORWARD <" << this->name << ">";
                 pwmStartPercent = 0;
                 gpioInValue = GpioValue::LOW;
                 rampPolarity = 1;
                 break;
             case MotorDirection::REVERSE:
+                VLOG(2) << "Motor direction will be REVERSE <" << this->name << ">";
                 pwmStartPercent = 100;
                 gpioInValue = GpioValue::HIGH;
                 rampPolarity = -1;
@@ -256,6 +331,7 @@ namespace RVR
         std::chrono::high_resolution_clock::time_point rampStartTime = std::chrono::high_resolution_clock::now();
         double pwmPercent;
 
+        VLOG(2) << "Ramping up motor speed for " << this->rampTime << " (ms) <" << this->name << ">";
         do // Note, no print functions inside this loop because they will slow it down
         {
             loopCount++;
@@ -276,11 +352,13 @@ namespace RVR
         this->In1Pwm->setDutyCyclePercent(pwmStartPercent + rampPolarity * targetSpeedPercent);
 
         this->state = MotorState::RUNNING;
+        VLOG(1) << "Motor is now running <" << this->name << ">";
         return 0;
     }
 
-    int DcMotor::stopMotor()
+    int DRV8842Motor::stopMotor()
     {
+        VLOG(1) << "Stopping motor <" << this->name << ">";
         if (this->state == MotorState::RUNNING)
         {
             this->In2Gpio->setValue(GpioValue::LOW);
@@ -296,11 +374,12 @@ namespace RVR
         }
     }
 
-    double DcMotor::getSpeed()
+    double DRV8842Motor::getSpeed()
     {
+        VLOG(1) << "Fetching motor speed <" << this->name << ">";
         double speed = (this->In1Pwm->getDutyCycleTime() * 100) / (double) this->In1Pwm->getPeriod();
+        VLOG(1) << "Motor speed is currently "<<speed<<"% <" << this->name << ">";
         return speed;
     }
-}
 
-#pragma clang diagnostic pop
+}
