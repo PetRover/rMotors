@@ -87,6 +87,8 @@ namespace RVR
 
         bool readFault();
 
+        int getMaxCurrent(); // Returns that maximum current of the motor in mA
+
     protected:
         MotorState state;
 

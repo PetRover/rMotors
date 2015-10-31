@@ -20,9 +20,9 @@ namespace RVR
         this->name = name;
 
         this->FaultGpio = new GpioPin(fault);
-        this->SleepGpio = new GpioPin(sleep);
-        this->ResetGpio = new GpioPin(reset);
-        this->DecayGpio = new GpioPin(decay);
+        this->SleepGpio = new GpioPin(sleep, GpioDirection::OUT);
+        this->ResetGpio = new GpioPin(reset, GpioDirection::OUT);
+        this->DecayGpio = new GpioPin(decay, GpioDirection::OUT);
 
     }
 
@@ -98,6 +98,12 @@ namespace RVR
         }
     }
 
+
+    int DRV88XXMotor::getMaxCurrent()
+    {
+        return this->I_FULL_SCALE;
+    }
+
     // ==============================================================
     // DRV8843Motor Class Member functions
     // ==============================================================
@@ -108,20 +114,20 @@ namespace RVR
         VLOG(1) << "Initializing motor [STEPPER] <" << this->name << ">";
 
         this->aIn1Pwm = new PwmPin(aIn1);
-        this->aIn2Gpio = new GpioPin(aIn2);
+        this->aIn2Gpio = new GpioPin(aIn2, GpioDirection::OUT);
         this->bIn1Pwm = new PwmPin(bIn1);
-        this->bIn2Gpio = new GpioPin(bIn2);
-        this->aI0Gpio = new GpioPin(aI0);
-        this->aI1Gpio = new GpioPin(aI1);
-        this->bI1Gpio = new GpioPin(bI0);
-        this->bI0Gpio = new GpioPin(bI1);
+        this->bIn2Gpio = new GpioPin(bIn2, GpioDirection::OUT);
+        this->aI0Gpio = new GpioPin(aI0, GpioDirection::OUT);
+        this->aI1Gpio = new GpioPin(aI1, GpioDirection::OUT);
+        this->bI1Gpio = new GpioPin(bI0, GpioDirection::OUT);
+        this->bI0Gpio = new GpioPin(bI1, GpioDirection::OUT);
 
         this->aIn1Pwm->setEnable(false);
         this->bIn1Pwm->setEnable(false);
-        VLOG(2) << "Setting PWM frequency to 1000000 <" << this->name << ">";
-        this->aIn1Pwm->setPeriod(1000000); // F_PWM recommended between 0 and 100KHz TODO fix this PWM frequency
-        this->bIn1Pwm->setPeriod(1000000); // F_PWM recommended between 0 and 100KHz TODO fix this PWM frequency
-        this->state = MotorState::STOPPED;
+
+        this->reset();
+        this->sleep();
+
         VLOG(1) << "Motor initialized [STEPPER] <" << this->name << ">";
     }
 
@@ -183,17 +189,17 @@ namespace RVR
     {
         VLOG(1) << "Initializing motor [DC] <" << this->name << ">";
         this->In1Pwm = new PwmPin(in1);
-        this->In2Gpio = new GpioPin(in2);
-        this->I0Gpio = new GpioPin(i0);
-        this->I1Gpio = new GpioPin(i1);
-        this->I2Gpio = new GpioPin(i2);
-        this->I3Gpio = new GpioPin(i3);
-        this->I4Gpio = new GpioPin(i4);
+        this->In2Gpio = new GpioPin(in2, GpioDirection::OUT);
+        this->I0Gpio = new GpioPin(i0, GpioDirection::OUT);
+        this->I1Gpio = new GpioPin(i1, GpioDirection::OUT);
+        this->I2Gpio = new GpioPin(i2, GpioDirection::OUT);
+        this->I3Gpio = new GpioPin(i3, GpioDirection::OUT);
+        this->I4Gpio = new GpioPin(i4, GpioDirection::OUT);
 
         this->In1Pwm->setEnable(false);
-        VLOG(2) << "Setting PWM frequency to 1000000 <" << this->name << ">";
-        this->In1Pwm->setPeriod(1000000); // F_PWM recommended between 0 and 100KHz TODO fix this PWM frequency
-        this->state = MotorState::STOPPED;
+
+        this->reset();
+        this->sleep();
         VLOG(1) << "Motor initialized [DC] <" << name << ">";
     }
 
@@ -216,7 +222,7 @@ namespace RVR
             currentLimit = this->I_FULL_SCALE;
         }
         int percentOfFullScale = (currentLimit * 100) / this->I_FULL_SCALE;
-        VLOG(1) << "Setting motor current limit to" << percentOfFullScale << "% (" << currentLimit << "mA) <" <<
+        VLOG(1) << "Setting motor current limit to " << percentOfFullScale << "% (" << currentLimit << "mA) <" <<
                 this->name << ">";
         int fiveBitValue = (percentOfFullScale * 100) * 31 / 10000;
 
