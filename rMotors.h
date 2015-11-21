@@ -103,6 +103,8 @@ namespace RVR
     class DRV8843Motor : public DRV88XXMotor
     {
     private:
+        int currentState = 0;
+
         void init(int aIn1, int aIn2, int bIn1, int bIn2, int aI0, int aI1, int bI0, int bI1);
 
         PwmPin *aIn1Pwm; // A pin object that allows control of the BIN1 pin of the motor controller
@@ -128,8 +130,13 @@ namespace RVR
                      int decay, RVR::PowerRail *powerRail, int vRef, int rSense, std::string name);
 
         void setCurrentLimit(int currentLimit);
-        int startMotor(){return -1;};
+        void enableMotor();
+        int startMotor(int speed, MotorDirection direction);
         int stopMotor(){return -1;};
+
+        void step(MotorDirection direction);
+
+
 
     };
 

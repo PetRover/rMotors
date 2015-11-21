@@ -182,6 +182,60 @@ namespace RVR
         }
     }
 
+    void DRV8843Motor::enableMotor()
+    {
+        this->aIn1Pwm->setEnable(true);
+        this->bIn1Pwm->setEnable(true);
+        this->step(MotorDirection::FORWARD);
+        this->step(MotorDirection::REVERSE);
+    }
+
+    void DRV8843Motor::step(MotorDirection direction)
+    {
+        int increment;
+        switch (direction)
+        {
+            case MotorDirection::FORWARD:
+                increment = 1;
+                break;
+            case MotorDirection::REVERSE:
+                increment = -1;
+                break;
+        }
+
+        this->currentState = (this->currentState + increment) % 4;
+
+        switch (currentState)
+        {
+            case 0:
+                this->aIn1Pwm->setDutyCyclePercent(100);
+                this->aIn2Gpio->setValue(GpioValue::LOW);
+                this->bIn1Pwm->setDutyCyclePercent(100);
+                this->bIn2Gpio->setValue(GpioValue::LOW);
+                break;
+            case 1:
+                this->aIn1Pwm->setDutyCyclePercent(0);
+                this->aIn2Gpio->setValue(GpioValue::HIGH);
+                this->bIn1Pwm->setDutyCyclePercent(100);
+                this->bIn2Gpio->setValue(GpioValue::LOW);
+                break;
+            case 2:
+                this->aIn1Pwm->setDutyCyclePercent(0);
+                this->aIn2Gpio->setValue(GpioValue::HIGH);
+                this->bIn1Pwm->setDutyCyclePercent(0);
+                this->bIn2Gpio->setValue(GpioValue::HIGH);
+                break;
+            case 3:
+                this->aIn1Pwm->setDutyCyclePercent(100);
+                this->aIn2Gpio->setValue(GpioValue::LOW);
+                this->bIn1Pwm->setDutyCyclePercent(0);
+                this->bIn2Gpio->setValue(GpioValue::HIGH);
+                break;
+            default:
+                throw(std::runtime_error("invaid current state of stepper motor"));
+        }
+    }
+
     // ==============================================================
     // DRV8842Motor Class Member functions
     // ==============================================================
