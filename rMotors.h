@@ -136,8 +136,6 @@ namespace RVR
 
         void step(MotorDirection direction);
 
-
-
     };
 
     // Subclass to represent a DC motor (controlled by the DRV8842 chip)
@@ -178,6 +176,29 @@ namespace RVR
         double getSpeed();
 
         int stopMotor();
+    };
+// Subclass to represent a stepper motor (controlled by the DRV8843 chip)
+    class GPIOStepperMotor
+    {
+    private:
+        bool enabled;
+        std::string name;
+        int currentState = 0;
+
+        GpioPin *aIn1Gpio; // A pin object that allows control of the BIN1 pin of the motor controller
+        GpioPin *aIn2Gpio; // A pin object that allows control of the BIN2 pin of the motor controller
+        GpioPin *bIn1Gpio; // A pin object that allows control of the BIN1 pin of the motor controller
+        GpioPin *bIn2Gpio; // A pin object that allows control of the BIN2 pin of the motor controller
+    public:
+
+        GPIOStepperMotor(int aIn1, int aIn2, int bIn1, int bIn2, std::string name);
+
+        int startMotor(int speed, MotorDirection direction);
+        int stopMotor(){return -1;};
+        void enableMotor();
+        void disableMotor();
+        void step(MotorDirection direction);
+
     };
 
 }

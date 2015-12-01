@@ -442,4 +442,82 @@ namespace RVR
         return speed;
     }
 
+    GPIOStepperMotor::GPIOStepperMotor(int aIn1, int aIn2, int bIn1, int bIn2, std::string name)
+    {
+        this->name = name;
+
+        this->aIn1Gpio = new GpioPin(aIn1, GpioDirection::OUT);
+        this->aIn2Gpio = new GpioPin(aIn2, GpioDirection::OUT);
+        this->bIn1Gpio = new GpioPin(bIn1, GpioDirection::OUT);
+        this->bIn2Gpio = new GpioPin(bIn2, GpioDirection::OUT);
+
+        this->aIn1Gpio->setValue(GpioValue::LOW);
+        this->aIn2Gpio->setValue(GpioValue::LOW);
+        this->bIn1Gpio->setValue(GpioValue::LOW);
+        this->bIn2Gpio->setValue(GpioValue::LOW);
+
+        this->disableMotor();
+    }
+
+    void GPIOStepperMotor::step(MotorDirection direction)
+        {
+            VLOG(3) << "Stepping Motor ["<< this->name <<"]";
+            int increment;
+            switch (direction)
+            {
+                case MotorDirection::FORWARD:
+                    increment = 1;
+                    break;
+                case MotorDirection::REVERSE:
+                    increment = -1;
+                    break;
+            }
+
+            this->currentState = (this->currentState + increment) % 4;
+            if (this->currentState == -1) this->currentState = 3;
+            LOG(DEBUG) << "Current Stepper state is: " << this->currentState;
+            switch (currentState)
+            {
+                case 0:
+                    this->aIn1Gpio->setValue(GpioValue::HIGH);
+                    this->aIn2Gpio->setValue(GpioValue::LOW);
+                    this->bIn1Gpio->setValue(GpioValue::HIGH);
+                    this->bIn2Gpio->setValue(GpioValue::LOW);
+                    break;
+                case 1:
+                    this->aIn1Gpio->setValue(GpioValue::LOW);
+                    this->aIn2Gpio->setValue(GpioValue::HIGH);
+                    this->bIn1Gpio->setValue(GpioValue::HIGH);
+                    this->bIn2Gpio->setValue(GpioValue::LOW);
+                    break;
+                case 2:
+                    this->aIn1Gpio->setValue(GpioValue::LOW);
+                    this->aIn2Gpio->setValue(GpioValue::HIGH);
+                    this->bIn1Gpio->setValue(GpioValue::LOW);
+                    this->bIn2Gpio->setValue(GpioValue::HIGH);
+                    break;
+                case 3:
+                    this->aIn1Gpio->setValue(GpioValue::HIGH);
+                    this->aIn2Gpio->setValue(GpioValue::LOW);
+                    this->bIn1Gpio->setValue(GpioValue::LOW);
+                    this->bIn2Gpio->setValue(GpioValue::HIGH);
+                    break;
+                default:
+                    throw(std::runtime_error("invaid current state of stepper motor"));
+            }
+        }
+    void GPIOStepperMotor::enableMotor()
+    {
+        this->enabled = true;
+        this->step(MotorDirection::FORWARD);
+    }
+
+    void GPIOStepperMotor::disableMotor()
+    {
+        this->enabled = false;
+        this->aIn1Gpio->setValue(GpioValue::LOW);
+        this->aIn2Gpio->setValue(GpioValue::LOW);
+        this->bIn1Gpio->setValue(GpioValue::LOW);
+        this->bIn2Gpio->setValue(GpioValue::LOW);
+    }
 }
