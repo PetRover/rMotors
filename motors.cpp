@@ -475,7 +475,6 @@ namespace RVR
 
             this->currentState = (this->currentState + increment) % 4;
             if (this->currentState == -1) this->currentState = 3;
-            LOG(DEBUG) << "Current Stepper state is: " << this->currentState;
             switch (currentState)
             {
                 case 0:
